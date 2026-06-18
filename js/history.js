@@ -18,6 +18,7 @@ async function renderHistory() {
     <section id="record-detail" hidden>
       <h2 id="detail-date-label"></h2>
       <div id="detail-content"></div>
+      <div id="detail-actions" class="detail-actions"></div>
     </section>
 
     <section>
@@ -107,9 +108,10 @@ function buildList() {
 }
 
 function showDetail(dateStr) {
-  const rec = allRecords.find(r => r.date === dateStr);
-  const wd  = weekdayJp(new Date(dateStr + 'T00:00:00'));
+  const rec     = allRecords.find(r => r.date === dateStr);
+  const wd      = weekdayJp(new Date(dateStr + 'T00:00:00'));
   const section = document.getElementById('record-detail');
+  const today   = dateKey(new Date());
 
   document.getElementById('detail-date-label').textContent =
     `${dateStr.replace(/-/g,'/')}（${WDAY[wd]}）`;
@@ -127,9 +129,92 @@ function showDetail(dateStr) {
       : '';
     const noteHTML  = rec.note  ? `<p class="detail-note">📝 ${escHtml(rec.note)}</p>`  : '';
     const extraHTML = rec.extra ? `<p class="detail-extra">➕ ${escHtml(rec.extra)}</p>` : '';
-    document.getElementById('detail-content').innerHTML = itemsHTML + noteHTML + extraHTML;
+    const body = itemsHTML + noteHTML + extraHTML;
+    document.getElementById('detail-content').innerHTML =
+      body || '<p class="placeholder">（内容なし）</p>';
+  }
+
+  const isFuture  = dateStr > today;
+  const actionsEl = document.getElementById('detail-actions');
+  if (!isFuture) {
+    actionsEl.innerHTML =
+      '<button id="detail-edit-btn" class="btn-secondary edit-btn">編集</button>';
+    document.getElementById('detail-edit-btn')
+      .addEventListener('click', () => showEditForm(dateStr));
+  } else {
+    actionsEl.innerHTML =
+      '<p class="detail-future-note">未来日付は編集できません</p>';
   }
 
   section.hidden = false;
   section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function showEditForm(dateStr) {
+  const contentEl = document.getElementById('detail-content');
+  const actionsEl = document.getElementById('detail-actions');
+
+  contentEl.innerHTML = '<p class="placeholder">読込中...</p>';
+  actionsEl.innerHTML = '';
+
+  let existingRecord = null;
+  let menuItems  = [];
+  let weekNumber = null;
+
+  try {
+    const existing = await dbGetAllByIndex('records', 'date', dateStr);
+    existingRecord = existing.length > 0 ? existing[0] : null;
+    weekNumber = existingRecord?.weekNumber ?? null;
+
+    const activeSetting = await dbGet('settings', 'activePlanId');
+    if (activeSetting) {
+      const plan = await dbGet('plans', activeSetting.value);
+      if (plan) {
+        if (weekNumber === null) weekNumber = plan.weekNumber;
+        const wd    = weekdayJp(new Date(dateStr + 'T00:00:00'));
+        const entry = (plan.days || []).find(d => d.day === wd);
+        if (entry) menuItems = entry.menu || [];
+      }
+    }
+  } catch (err) {
+    console.error('編集データの読込に失敗しました:', err);
+    contentEl.innerHTML = '<p class="placeholder error">読込に失敗しました</p>';
+    return;
+  }
+
+  const editContainer = document.createElement('div');
+  editContainer.className = 'edit-form-container';
+  editContainer.innerHTML = buildRecordFormHTML(menuItems, existingRecord);
+  contentEl.innerHTML = '';
+  contentEl.appendChild(editContainer);
+
+  actionsEl.innerHTML = `
+    <div class="edit-actions">
+      <button id="edit-cancel-btn" class="btn-secondary">キャンセル</button>
+      <button id="edit-save-btn" class="btn-primary">保存</button>
+    </div>
+    <p id="edit-status" class="status-msg" aria-live="polite"></p>
+  `;
+
+  document.getElementById('edit-save-btn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('edit-status');
+    statusEl.className = 'status-msg';
+    statusEl.textContent = '';
+    try {
+      await saveRecordForDate(dateStr, editContainer, weekNumber);
+      allRecords = await dbGetAll('records');
+      allRecords.sort((a, b) => b.date.localeCompare(a.date));
+      buildCalendar();
+      buildList();
+      showDetail(dateStr);
+    } catch (err) {
+      console.error('記録の保存に失敗しました:', err);
+      statusEl.className = 'status-msg error';
+      statusEl.textContent = '保存に失敗しました';
+    }
+  });
+
+  document.getElementById('edit-cancel-btn').addEventListener('click', () => {
+    showDetail(dateStr);
+  });
 }

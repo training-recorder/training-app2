@@ -2,6 +2,49 @@ const WEEKDAY_LABEL = ['', '月', '火', '水', '木', '金', '土', '日'];
 
 let _homeVideoShownId = null;
 
+// ── 共通：記録フォームHTML生成 ────────────────────────────────
+// history.js の編集モードからも呼び出す。
+// menuItems: [{name, duration}, ...], existingRecord: record object or null
+function buildRecordFormHTML(menuItems, existingRecord) {
+  const existingItems = existingRecord?.items || [];
+  const checkboxesHTML = menuItems.length > 0
+    ? `<div class="record-items">${
+        menuItems.map(item => {
+          const done = existingItems.find(r => r.name === item.name)?.done ?? false;
+          return `
+            <label class="record-check-label">
+              <input type="checkbox" class="record-item-check"
+                data-name="${escHtml(item.name)}"${done ? ' checked' : ''}>
+              <span>${escHtml(item.name)}</span>
+            </label>`;
+        }).join('')
+      }</div>`
+    : '';
+
+  return `${checkboxesHTML}
+    <div class="record-form">
+      <label class="form-label">体調メモ</label>
+      <textarea class="rf-note" rows="2"
+        placeholder="体調・気づきなど...">${escHtml(existingRecord?.note || '')}</textarea>
+      <label class="form-label">追加でやったこと</label>
+      <textarea class="rf-extra" rows="2"
+        placeholder="メニュー外の運動など...">${escHtml(existingRecord?.extra || '')}</textarea>
+    </div>`;
+}
+
+// ── 共通：記録を指定日付でupsert ────────────────────────────
+// containerEl 内の .record-item-check / .rf-note / .rf-extra を読んで保存する。
+async function saveRecordForDate(dk, containerEl, weekNumber) {
+  const checks = [...containerEl.querySelectorAll('.record-item-check')];
+  const items  = checks.map(cb => ({ name: cb.dataset.name, done: cb.checked }));
+  const note   = containerEl.querySelector('.rf-note')?.value ?? '';
+  const extra  = containerEl.querySelector('.rf-extra')?.value ?? '';
+  const existing = await dbGetAllByIndex('records', 'date', dk);
+  const record   = { date: dk, weekNumber, items, note, extra };
+  if (existing.length > 0) record.id = existing[0].id;
+  return dbPut('records', record);
+}
+
 async function renderHome() {
   _homeVideoShownId = null;
 
@@ -13,21 +56,25 @@ async function renderHome() {
 
   const el = document.getElementById('screen-home');
 
-  // ── アクティブプランを読む ──
+  // ── データ一括読込（HTML生成前） ──
   let planInfoHTML = '';
   let menuHTML     = '<p class="placeholder">まだメニューがありません</p>';
   let todayItems   = [];
   let todayGenre   = null;
+  let weekNumber   = null;
+  let existingRecord = null;
+  let goalValue    = '';
 
   try {
     const activeSetting = await dbGet('settings', 'activePlanId');
     if (activeSetting) {
       const plan = await dbGet('plans', activeSetting.value);
       if (plan) {
+        weekNumber = plan.weekNumber;
         planInfoHTML = `
           <div class="plan-info">
             <span class="plan-title">${escHtml(plan.title)}</span>
-            <span class="plan-week">第 ${plan.weekNumber} 週</span>
+            <span class="plan-week">第 ${escHtml(plan.weekNumber)} 週</span>
           </div>
           ${plan.note ? `<p class="plan-note">${escHtml(plan.note)}</p>` : ''}`;
 
@@ -43,7 +90,7 @@ async function renderHome() {
           menuHTML = `
             <div class="day-header">
               ${todayGenre ? `<span class="day-genre">${escHtml(todayGenre)}</span>` : ''}
-              ${entry.totalMinutes ? `<span class="day-total">計 ${entry.totalMinutes} 分</span>` : ''}
+              ${entry.totalMinutes ? `<span class="day-total">計 ${escHtml(entry.totalMinutes)} 分</span>` : ''}
             </div>
             <ul class="menu-list">${rows}</ul>`;
         } else {
@@ -51,21 +98,15 @@ async function renderHome() {
         }
       }
     }
-  } catch (err) {
-    console.error('プランの読込に失敗しました:', err);
-  }
 
-  // ── チェックボックス ──
-  const checkboxesHTML = todayItems.length > 0
-    ? `<div class="record-items">${
-        todayItems.map((item, i) => `
-          <label class="record-check-label">
-            <input type="checkbox" class="record-item-check"
-              data-name="${escHtml(item.name)}" id="rcheck_${i}">
-            <span>${escHtml(item.name)}</span>
-          </label>`).join('')
-      }</div>`
-    : '';
+    const existing = await dbGetAllByIndex('records', 'date', dk);
+    existingRecord = existing.length > 0 ? existing[0] : null;
+
+    const savedGoal = await dbGet('settings', 'longTermGoal');
+    if (savedGoal) goalValue = savedGoal.value;
+  } catch (err) {
+    console.error('データの読込に失敗しました:', err);
+  }
 
   // ── 動画セクション ──
   const videoSectionHTML = todayGenre
@@ -90,14 +131,10 @@ async function renderHome() {
 
     ${videoSectionHTML}
 
-    <section>
+    <section class="home-record-section">
       <h2>今日の記録</h2>
-      ${checkboxesHTML}
-      <div class="record-form">
-        <label for="record-note" class="form-label">体調メモ</label>
-        <textarea id="record-note" rows="2" placeholder="体調・気づきなど..."></textarea>
-        <label for="record-extra" class="form-label">追加でやったこと</label>
-        <textarea id="record-extra" rows="2" placeholder="メニュー外の運動など..."></textarea>
+      ${buildRecordFormHTML(todayItems, existingRecord)}
+      <div class="form-btn-row">
         <button id="record-save-btn" class="btn-primary">記録を保存</button>
       </div>
       <p id="record-status" class="status-msg" aria-live="polite"></p>
@@ -106,37 +143,15 @@ async function renderHome() {
     <section>
       <h2>長期目標</h2>
       <div class="goal-form">
-        <textarea id="goal-input" rows="3" placeholder="長期目標を入力..."></textarea>
+        <textarea id="goal-input" rows="3"
+          placeholder="長期目標を入力...">${escHtml(goalValue)}</textarea>
         <button id="goal-save-btn" class="btn-primary">保存</button>
       </div>
       <p id="goal-status" class="status-msg" aria-live="polite"></p>
     </section>
   `;
 
-  // ── 動画を非同期ロード ──
   if (todayGenre) loadHomeTodayVideo(todayGenre);
-
-  // ── 既存データを復元 ──
-  try {
-    const savedGoal = await dbGet('settings', 'longTermGoal');
-    if (savedGoal) document.getElementById('goal-input').value = savedGoal.value;
-
-    const existing = await dbGetAllByIndex('records', 'date', dk);
-    if (existing.length > 0) {
-      const rec = existing[0];
-      (rec.items || []).forEach(item => {
-        if (!item.done) return;
-        document.querySelectorAll('.record-item-check').forEach(cb => {
-          if (cb.dataset.name === item.name) cb.checked = true;
-        });
-      });
-      if (rec.note)  document.getElementById('record-note').value  = rec.note;
-      if (rec.extra) document.getElementById('record-extra').value = rec.extra;
-    }
-  } catch (err) {
-    console.error('データの読込に失敗しました:', err);
-  }
-
   document.getElementById('goal-save-btn').addEventListener('click', saveGoal);
   document.getElementById('record-save-btn').addEventListener('click', saveRecord);
 }
@@ -172,7 +187,7 @@ function renderHomeTodayVideo(genre, videos) {
   container.innerHTML = `
     <div class="video-card">
       ${pick.title ? `<p class="video-pick-title">${escHtml(pick.title)}</p>` : ''}
-      <a class="video-pick-link" href="${escHtml(pick.url)}"
+      <a class="video-pick-link" href="${escHtml(safeUrl(pick.url))}"
         target="_blank" rel="noopener noreferrer">▶ 動画を開く</a>
       <p class="video-pick-url-text">${escHtml(
         pick.url.length > 50 ? pick.url.slice(0, 50) + '…' : pick.url
@@ -214,15 +229,11 @@ async function saveGoal() {
 
 // ── 今日の記録の保存 ──
 async function saveRecord() {
-  const dk     = dateKey(new Date());
-  const status = document.getElementById('record-status');
+  const dk      = dateKey(new Date());
+  const status  = document.getElementById('record-status');
+  const section = document.querySelector('.home-record-section');
   status.className = 'status-msg';
   status.textContent = '';
-
-  const checks = [...document.querySelectorAll('.record-item-check')];
-  const items  = checks.map(cb => ({ name: cb.dataset.name, done: cb.checked }));
-  const note   = document.getElementById('record-note').value;
-  const extra  = document.getElementById('record-extra').value;
 
   try {
     let weekNumber = null;
@@ -231,12 +242,7 @@ async function saveRecord() {
       const plan = await dbGet('plans', activeSetting.value);
       if (plan) weekNumber = plan.weekNumber;
     }
-
-    const existing = await dbGetAllByIndex('records', 'date', dk);
-    const record   = { date: dk, weekNumber, items, note, extra };
-    if (existing.length > 0) record.id = existing[0].id;
-
-    await dbPut('records', record);
+    await saveRecordForDate(dk, section, weekNumber);
     status.textContent = '記録を保存しました ✓';
     setTimeout(() => { status.textContent = ''; }, 2000);
   } catch (err) {

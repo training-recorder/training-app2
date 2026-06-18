@@ -68,7 +68,7 @@ function renderVideoList(videos) {
     <div class="video-item">
       <div class="video-info">
         ${v.title ? `<div class="video-title">${escHtml(v.title)}</div>` : ''}
-        <a class="video-url" href="${escHtml(v.url)}"
+        <a class="video-url" href="${escHtml(safeUrl(v.url))}"
           target="_blank" rel="noopener noreferrer">
           ${escHtml(v.url.length > 48 ? v.url.slice(0, 48) + '…' : v.url)}
         </a>

@@ -639,3 +639,37 @@ section h2 {
 }
 
 .btn-delete:active { background: var(--border); }
+
+/* ── 記録保存ボタン行 ── */
+.form-btn-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* ── 履歴編集 ── */
+.detail-actions {
+  margin-top: 14px;
+}
+
+.edit-btn {
+  width: 100%;
+}
+
+.edit-form-container {
+  margin-bottom: 4px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.detail-future-note {
+  font-size: 0.82rem;
+  color: var(--text-sub);
+  font-style: italic;
+  margin-top: 10px;
+}
