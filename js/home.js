@@ -2,9 +2,69 @@ const WEEKDAY_LABEL = ['', '月', '火', '水', '木', '金', '土', '日'];
 
 let _homeVideoShownId = null;
 
+// よくやるメニュー定義（id は record.frequent のキーと一致させる）
+const FREQUENT_ITEMS = [
+  { id: 'walking', label: 'ウォーキング', type: 'time'   },
+  { id: 'plank',   label: 'プランク',     type: 'minsec' },
+  { id: 'squats',  label: 'スクワット',   type: 'repsets'},
+];
+
+// ── 内部：よくやるメニュー1項目のHTML ──
+function buildFrequentItemHTML(item, freq) {
+  const f = freq?.[item.id] || {};
+  if (item.type === 'time') {
+    return `
+      <div class="freq-item">
+        <span class="freq-label">${escHtml(item.label)}</span>
+        <div class="freq-inputs">
+          <input type="number" class="freq-input"
+            data-freq-id="${item.id}" data-freq-field="hours"
+            min="0" inputmode="numeric" value="${f.hours || ''}">
+          <span class="freq-unit">時間</span>
+          <input type="number" class="freq-input"
+            data-freq-id="${item.id}" data-freq-field="minutes"
+            min="0" max="59" inputmode="numeric" value="${f.minutes || ''}">
+          <span class="freq-unit">分</span>
+        </div>
+      </div>`;
+  }
+  if (item.type === 'minsec') {
+    return `
+      <div class="freq-item">
+        <span class="freq-label">${escHtml(item.label)}</span>
+        <div class="freq-inputs">
+          <input type="number" class="freq-input"
+            data-freq-id="${item.id}" data-freq-field="minutes"
+            min="0" inputmode="numeric" value="${f.minutes || ''}">
+          <span class="freq-unit">分</span>
+          <input type="number" class="freq-input"
+            data-freq-id="${item.id}" data-freq-field="seconds"
+            min="0" max="59" inputmode="numeric" value="${f.seconds || ''}">
+          <span class="freq-unit">秒</span>
+        </div>
+      </div>`;
+  }
+  if (item.type === 'repsets') {
+    return `
+      <div class="freq-item">
+        <span class="freq-label">${escHtml(item.label)}</span>
+        <div class="freq-inputs">
+          <input type="number" class="freq-input"
+            data-freq-id="${item.id}" data-freq-field="reps"
+            min="0" inputmode="numeric" value="${f.reps || ''}">
+          <span class="freq-unit">回</span>
+          <input type="number" class="freq-input"
+            data-freq-id="${item.id}" data-freq-field="sets"
+            min="0" inputmode="numeric" value="${f.sets || ''}">
+          <span class="freq-unit">セット</span>
+        </div>
+      </div>`;
+  }
+  return '';
+}
+
 // ── 共通：記録フォームHTML生成 ────────────────────────────────
 // history.js の編集モードからも呼び出す。
-// menuItems: [{name, duration}, ...], existingRecord: record object or null
 function buildRecordFormHTML(menuItems, existingRecord) {
   const existingItems = existingRecord?.items || [];
   const checkboxesHTML = menuItems.length > 0
@@ -21,6 +81,13 @@ function buildRecordFormHTML(menuItems, existingRecord) {
       }</div>`
     : '';
 
+  const freq = existingRecord?.frequent;
+  const frequentHTML = `
+    <div class="freq-section">
+      <div class="freq-heading">よくやるメニュー</div>
+      ${FREQUENT_ITEMS.map(item => buildFrequentItemHTML(item, freq)).join('')}
+    </div>`;
+
   return `${checkboxesHTML}
     <div class="record-form">
       <label class="form-label">体調メモ</label>
@@ -29,18 +96,32 @@ function buildRecordFormHTML(menuItems, existingRecord) {
       <label class="form-label">追加でやったこと</label>
       <textarea class="rf-extra" rows="2"
         placeholder="メニュー外の運動など...">${escHtml(existingRecord?.extra || '')}</textarea>
-    </div>`;
+    </div>
+    ${frequentHTML}`;
 }
 
 // ── 共通：記録を指定日付でupsert ────────────────────────────
-// containerEl 内の .record-item-check / .rf-note / .rf-extra を読んで保存する。
+// containerEl 内の .record-item-check / .rf-note / .rf-extra / .freq-input を読んで保存。
 async function saveRecordForDate(dk, containerEl, weekNumber) {
   const checks = [...containerEl.querySelectorAll('.record-item-check')];
   const items  = checks.map(cb => ({ name: cb.dataset.name, done: cb.checked }));
-  const note   = containerEl.querySelector('.rf-note')?.value ?? '';
+  const note   = containerEl.querySelector('.rf-note')?.value  ?? '';
   const extra  = containerEl.querySelector('.rf-extra')?.value ?? '';
+
+  const frequent = {};
+  FREQUENT_ITEMS.forEach(item => {
+    const inputs = [...containerEl.querySelectorAll(`.freq-input[data-freq-id="${item.id}"]`)];
+    const vals   = {};
+    inputs.forEach(inp => {
+      let v = parseInt(inp.value, 10);
+      if (isNaN(v) || v < 0) v = 0;
+      vals[inp.dataset.freqField] = v;
+    });
+    frequent[item.id] = vals;
+  });
+
   const existing = await dbGetAllByIndex('records', 'date', dk);
-  const record   = { date: dk, weekNumber, items, note, extra };
+  const record   = { date: dk, weekNumber, items, note, extra, frequent };
   if (existing.length > 0) record.id = existing[0].id;
   return dbPut('records', record);
 }
@@ -108,7 +189,6 @@ async function renderHome() {
     console.error('データの読込に失敗しました:', err);
   }
 
-  // ── 動画セクション ──
   const videoSectionHTML = todayGenre
     ? `<section>
          <h2>今日の動画 <span class="genre-badge">${escHtml(todayGenre)}</span></h2>

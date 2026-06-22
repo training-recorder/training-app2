@@ -94,6 +94,26 @@ function buildList() {
     let sub = doneItems.join('・');
     if (r.extra) sub += (sub ? '・' : '') + escHtml(r.extra);
     if (!sub && r.note) sub = escHtml(r.note);
+
+    // よくやるメニューをサマリーに追加（0/未入力は省略）
+    const freq = r.frequent;
+    if (freq) {
+      const freqParts = [];
+      const w = freq.walking;
+      if (w && (w.hours || w.minutes)) {
+        freqParts.push('ウォーキング' + (w.hours ? `${w.hours}時間` : '') + (w.minutes ? `${w.minutes}分` : ''));
+      }
+      const p = freq.plank;
+      if (p && (p.minutes || p.seconds)) {
+        freqParts.push('プランク' + (p.minutes ? `${p.minutes}分` : '') + (p.seconds ? `${p.seconds}秒` : ''));
+      }
+      const sq = freq.squats;
+      if (sq && (sq.reps || sq.sets)) {
+        freqParts.push(`スクワット${sq.reps || 0}回×${sq.sets || 0}セット`);
+      }
+      if (freqParts.length > 0) sub += (sub ? '・' : '') + freqParts.join('・');
+    }
+
     if (!sub) sub = '（メモなし）';
     return `
       <div class="history-item" data-date="${r.date}">
@@ -129,7 +149,45 @@ function showDetail(dateStr) {
       : '';
     const noteHTML  = rec.note  ? `<p class="detail-note">📝 ${escHtml(rec.note)}</p>`  : '';
     const extraHTML = rec.extra ? `<p class="detail-extra">➕ ${escHtml(rec.extra)}</p>` : '';
-    const body = itemsHTML + noteHTML + extraHTML;
+    // よくやるメニューの表示（0/未入力の項目は省略）
+    let frequentHTML = '';
+    const freq = rec.frequent;
+    if (freq) {
+      const parts = [];
+      const w = freq.walking;
+      if (w) {
+        const h = w.hours   || 0;
+        const m = w.minutes || 0;
+        if (h || m) {
+          let txt = 'ウォーキング ';
+          if (h) txt += `${escHtml(h)}時間`;
+          if (m) txt += `${escHtml(m)}分`;
+          parts.push(txt);
+        }
+      }
+      const p = freq.plank;
+      if (p) {
+        const pm = p.minutes || 0;
+        const ps = p.seconds || 0;
+        if (pm || ps) {
+          let txt = 'プランク ';
+          if (pm) txt += `${escHtml(pm)}分`;
+          if (ps) txt += `${escHtml(ps)}秒`;
+          parts.push(txt);
+        }
+      }
+      const sq = freq.squats;
+      if (sq) {
+        const r = sq.reps || 0;
+        const s = sq.sets || 0;
+        if (r || s) parts.push(`スクワット ${escHtml(r)}回×${escHtml(s)}セット`);
+      }
+      if (parts.length > 0) {
+        frequentHTML = `<div class="detail-frequent">${parts.join(' ／ ')}</div>`;
+      }
+    }
+
+    const body = itemsHTML + noteHTML + extraHTML + frequentHTML;
     document.getElementById('detail-content').innerHTML =
       body || '<p class="placeholder">（内容なし）</p>';
   }
