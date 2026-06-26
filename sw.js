@@ -1,4 +1,4 @@
-const CACHE_NAME = 'training-app-v8';
+const CACHE_NAME = 'training-app-v9';
 const APP_SHELL = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const APP_SHELL = [
   './js/import.js',
   './js/history.js',
   './js/videos.js',
+  './js/settings.js',
   './js/app.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

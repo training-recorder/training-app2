@@ -16,10 +16,11 @@ async function init() {
 
   const main = document.getElementById('main-content');
   main.innerHTML = `
-    <div id="screen-home"    class="screen active"></div>
-    <div id="screen-import"  class="screen"></div>
-    <div id="screen-history" class="screen"></div>
-    <div id="screen-videos"  class="screen"></div>
+    <div id="screen-home"     class="screen active"></div>
+    <div id="screen-import"   class="screen"></div>
+    <div id="screen-history"  class="screen"></div>
+    <div id="screen-videos"   class="screen"></div>
+    <div id="screen-settings" class="screen"></div>
   `;
 
   document.querySelectorAll('.nav-btn').forEach((btn) => {
@@ -40,9 +41,10 @@ function switchScreen(name) {
     btn.setAttribute('aria-current', isCurrent ? 'page' : 'false');
   });
 
-  if (name === 'home')    renderHome();
-  if (name === 'history') renderHistory();
-  if (name === 'videos')  renderVideos();
+  if (name === 'home')     renderHome();
+  if (name === 'history')  renderHistory();
+  if (name === 'videos')   renderVideos();
+  if (name === 'settings') renderSettings();
 }
 
 document.addEventListener('DOMContentLoaded', init);

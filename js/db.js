@@ -90,6 +90,41 @@ function deleteHike(id) {
   return dbDelete('hikes', id);
 }
 
+// ── エクスポート / インポート用 ──
+const ALL_STORES = ['plans', 'records', 'videoStock', 'settings', 'hikes'];
+
+function exportAllData() {
+  return openDB().then((db) => {
+    const tx = db.transaction(ALL_STORES, 'readonly');
+    return Promise.all(
+      ALL_STORES.map((store) => new Promise((resolve, reject) => {
+        const req = tx.objectStore(store).getAll();
+        req.onsuccess = () => resolve({ store, data: req.result });
+        req.onerror  = () => reject(req.error);
+      }))
+    );
+  }).then((results) => {
+    const data = {};
+    results.forEach(({ store, data: rows }) => { data[store] = rows; });
+    return data;
+  });
+}
+
+function importAllData(data) {
+  return openDB().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(ALL_STORES, 'readwrite');
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+    tx.onabort    = () => reject(tx.error);
+
+    ALL_STORES.forEach((store) => {
+      const os = tx.objectStore(store);
+      os.clear();
+      (data[store] || []).forEach((item) => os.put(item));
+    });
+  }));
+}
+
 function dbGetAllByIndex(store, indexName, value) {
   return openDB().then((db) => new Promise((resolve, reject) => {
     const req = db.transaction(store, 'readonly')

@@ -971,3 +971,100 @@ section h2 {
   border-radius: 8px;
   white-space: nowrap;
 }
+
+/* ── 設定タブ ── */
+.settings-section {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.07);
+}
+
+.settings-note {
+  font-size: 0.83rem;
+  color: var(--text-sub);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.settings-row {
+  margin-bottom: 14px;
+}
+
+.settings-btn {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.settings-last-export {
+  font-size: 0.78rem;
+  color: var(--text-sub);
+}
+
+.btn-danger {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--error);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-danger:active { opacity: 0.85; }
+
+.success-msg {
+  color: var(--success);
+  font-size: 0.88rem;
+  margin-top: 8px;
+}
+
+/* ── 確認ダイアログ ── */
+.dialog-overlay[hidden] { display: none; }
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.dialog-box {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 340px;
+  width: 100%;
+  box-shadow: 0 4px 20px rgba(0,0,0,.25);
+}
+
+.dialog-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.dialog-desc {
+  font-size: 0.88rem;
+  color: var(--text-sub);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.dialog-actions .btn-secondary,
+.dialog-actions .btn-danger {
+  flex: 1;
+}
