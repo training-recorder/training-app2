@@ -54,63 +54,81 @@ async function renderSettings() {
   document.getElementById('import-file-input').addEventListener('change', handleFileSelect);
   document.getElementById('dialog-cancel-btn').addEventListener('click', closeDialog);
 
-  // データをバックグラウンドで事前取得
+  // データをバックグラウンドで事前取得（失敗時は画面にも表示）
   _exportDataCache = null;
   exportAllData()
     .then((d) => { _exportDataCache = d; })
-    .catch((e) => { console.warn('export pre-fetch failed:', e); });
+    .catch((e) => {
+      console.warn('export pre-fetch failed:', e);
+      const msg = document.getElementById('settings-msg');
+      if (msg) {
+        msg.textContent = `[PF] データ取得失敗: ${escHtml(e.name)} – ${escHtml(e.message)}`;
+        msg.className = 'status-msg error-msg';
+      }
+    });
 }
 
 // ── エクスポート ──
-// クリックハンドラは同期関数にして、await を navigator.share より前に置かない。
-// iOS Safari はユーザージェスチャーが await をまたぐと失効するため。
+// 同期関数にして await を navigator.share より前に置かない（iOS ジェスチャー失効防止）
 function handleExport() {
   const msg = document.getElementById('settings-msg');
-  msg.className = 'status-msg';
-  msg.textContent = '';
+  const show = (text, isError) => {
+    msg.textContent = text;
+    msg.className = 'status-msg ' + (isError ? 'error-msg' : 'success-msg');
+  };
 
+  // ステージ1: プリフェッチ済みデータの確認
   if (!_exportDataCache) {
-    msg.textContent = 'データ準備中です。数秒後に再度お試しください。';
-    msg.className = 'status-msg error-msg';
+    show('[1] データ未取得。設定タブを閉じて開き直してください。', true);
     return;
   }
 
-  const now = new Date();
-  let payload;
+  // ステージ2: JSON 生成
+  let payload, blob, file, fileName;
   try {
+    const now = new Date();
+    fileName = `training-data-${dateKey(now)}.json`;
     payload = JSON.stringify({
       exportedAt: now.toISOString(),
       appVersion: 'stage9',
       data: _exportDataCache,
     });
+    blob = new Blob([payload], { type: 'application/json' });
+    file = new File([blob], fileName, { type: 'application/json' });
   } catch (e) {
-    msg.textContent = `エラー: ${escHtml(e.name)} – ${escHtml(e.message)}`;
-    msg.className = 'status-msg error-msg';
+    show(`[2] JSON生成失敗: ${escHtml(e.name)} – ${escHtml(e.message)}`, true);
     return;
   }
 
-  const fileName = `training-data-${dateKey(now)}.json`;
-  const blob = new Blob([payload], { type: 'application/json' });
-  const file = new File([blob], fileName, { type: 'application/json' });
+  const exportedAt = new Date();
 
-  // Web Share API（ファイル共有対応）が使える場合 → 共有シートを開く
-  // ※ここは await なしで呼ぶことでジェスチャーを維持する
+  // ステージ3: Web Share API（ファイル対応）
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     navigator.share({ files: [file], title: fileName })
-      .then(() => _saveLastExport(now))
+      .then(() => {
+        _saveLastExport(exportedAt);
+      })
       .catch((e) => {
         if (e.name === 'AbortError') return; // ユーザーキャンセル
-        // Share が失敗した場合はダウンロードで代替
-        console.warn('Web Share failed, falling back:', e.name, e.message);
-        _downloadFallback(blob, fileName);
-        _saveLastExport(now);
+        // Share 失敗 → ダウンロードで代替しつつエラー詳細を表示
+        show(`[3] Share失敗(${escHtml(e.name)}: ${escHtml(e.message)}) → ダウンロード試行中`, true);
+        try {
+          _downloadFallback(blob, fileName);
+          _saveLastExport(exportedAt);
+        } catch (e2) {
+          show(`[3+4] Share失敗後のDL也失敗: ${escHtml(e2.name)} – ${escHtml(e2.message)}`, true);
+        }
       });
     return;
   }
 
-  // Web Share 非対応環境 → ダウンロード
-  _downloadFallback(blob, fileName);
-  _saveLastExport(now);
+  // ステージ4: ダウンロードフォールバック（Web Share 非対応環境）
+  try {
+    _downloadFallback(blob, fileName);
+    _saveLastExport(exportedAt);
+  } catch (e) {
+    show(`[4] DL失敗: ${escHtml(e.name)} – ${escHtml(e.message)}`, true);
+  }
 }
 
 function _downloadFallback(blob, fileName) {
