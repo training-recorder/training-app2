@@ -1,3 +1,8 @@
+// 設定タブを開いた時点でデータをバックグラウンド取得しておく。
+// こうすることでエクスポートボタンのクリック時に await が不要になり、
+// iOS Safari でユーザージェスチャーが失効しなくなる。
+let _exportDataCache = null;
+
 async function renderSettings() {
   const el = document.getElementById('screen-settings');
 
@@ -48,57 +53,95 @@ async function renderSettings() {
   });
   document.getElementById('import-file-input').addEventListener('change', handleFileSelect);
   document.getElementById('dialog-cancel-btn').addEventListener('click', closeDialog);
+
+  // データをバックグラウンドで事前取得
+  _exportDataCache = null;
+  exportAllData()
+    .then((d) => { _exportDataCache = d; })
+    .catch((e) => { console.warn('export pre-fetch failed:', e); });
 }
 
 // ── エクスポート ──
-async function handleExport() {
+// クリックハンドラは同期関数にして、await を navigator.share より前に置かない。
+// iOS Safari はユーザージェスチャーが await をまたぐと失効するため。
+function handleExport() {
   const msg = document.getElementById('settings-msg');
+  msg.className = 'status-msg';
   msg.textContent = '';
+
+  if (!_exportDataCache) {
+    msg.textContent = 'データ準備中です。数秒後に再度お試しください。';
+    msg.className = 'status-msg error-msg';
+    return;
+  }
+
+  const now = new Date();
+  let payload;
   try {
-    const data = await exportAllData();
-    const now = new Date();
-    const payload = JSON.stringify({
+    payload = JSON.stringify({
       exportedAt: now.toISOString(),
       appVersion: 'stage9',
-      data,
+      data: _exportDataCache,
     });
-    const fileName = `training-data-${dateKey(now)}.json`;
-    const blob = new Blob([payload], { type: 'application/json' });
-    const file = new File([blob], fileName, { type: 'application/json' });
+  } catch (e) {
+    msg.textContent = `エラー: ${escHtml(e.name)} – ${escHtml(e.message)}`;
+    msg.className = 'status-msg error-msg';
+    return;
+  }
 
-    let shared = false;
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: fileName });
-        shared = true;
-      } catch (e) {
-        if (e.name === 'AbortError') {
-          // ユーザーがキャンセル → 何もしない
-          return;
-        }
-        // NotAllowedError 等（await後にジェスチャー失効など）→ ダウンロードで代替
-        console.warn('Web Share API failed, falling back to download:', e);
-      }
-    }
+  const fileName = `training-data-${dateKey(now)}.json`;
+  const blob = new Blob([payload], { type: 'application/json' });
+  const file = new File([blob], fileName, { type: 'application/json' });
 
-    if (!shared) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-    }
+  // Web Share API（ファイル共有対応）が使える場合 → 共有シートを開く
+  // ※ここは await なしで呼ぶことでジェスチャーを維持する
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: fileName })
+      .then(() => _saveLastExport(now))
+      .catch((e) => {
+        if (e.name === 'AbortError') return; // ユーザーキャンセル
+        // Share が失敗した場合はダウンロードで代替
+        console.warn('Web Share failed, falling back:', e.name, e.message);
+        _downloadFallback(blob, fileName);
+        _saveLastExport(now);
+      });
+    return;
+  }
 
+  // Web Share 非対応環境 → ダウンロード
+  _downloadFallback(blob, fileName);
+  _saveLastExport(now);
+}
+
+function _downloadFallback(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  // <a download> を試みる（PCブラウザ・Android Chrome で動作）
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // iOS Safari では download 属性が無視されるため window.open でフォールバック
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 30000);
+}
+
+async function _saveLastExport(now) {
+  try {
     await dbPut('settings', { key: 'lastExportedAt', value: now.toISOString() });
+    // キャッシュを更新（次回エクスポートで最新 settings を含むように）
+    _exportDataCache = await exportAllData().catch(() => _exportDataCache);
     const lastEl = document.querySelector('.settings-last-export');
     if (lastEl) lastEl.textContent = `最終エクスポート：${dateKey(now)}`;
-    msg.textContent = 'エクスポートしました。';
-    msg.className = 'status-msg success-msg';
-  } catch (err) {
-    console.error('エクスポートに失敗しました:', err);
-    msg.textContent = 'エクスポートに失敗しました。';
-    msg.className = 'status-msg error-msg';
+    const msg = document.getElementById('settings-msg');
+    if (msg) {
+      msg.textContent = 'エクスポートしました。';
+      msg.className = 'status-msg success-msg';
+    }
+  } catch (e) {
+    console.warn('lastExportedAt の保存に失敗:', e);
   }
 }
 
@@ -164,6 +207,7 @@ async function handleImportConfirm() {
 
   try {
     await importAllData(data);
+    _exportDataCache = null;
     msg.textContent = 'データを取り込みました。ホームに戻ります…';
     msg.className = 'status-msg success-msg';
     setTimeout(() => {
@@ -171,7 +215,7 @@ async function handleImportConfirm() {
     }, 1200);
   } catch (err) {
     console.error('インポートに失敗しました:', err);
-    msg.textContent = 'インポートに失敗しました。';
+    msg.textContent = `インポートに失敗しました。エラー: ${escHtml(err.name)} – ${escHtml(err.message)}`;
     msg.className = 'status-msg error-msg';
   }
 }
