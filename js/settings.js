@@ -72,9 +72,12 @@ async function handleExport() {
         await navigator.share({ files: [file], title: fileName });
         shared = true;
       } catch (e) {
-        if (e.name !== 'AbortError') throw e;
-        // ユーザーがキャンセルした場合は何もしない
-        return;
+        if (e.name === 'AbortError') {
+          // ユーザーがキャンセル → 何もしない
+          return;
+        }
+        // NotAllowedError 等（await後にジェスチャー失効など）→ ダウンロードで代替
+        console.warn('Web Share API failed, falling back to download:', e);
       }
     }
 
