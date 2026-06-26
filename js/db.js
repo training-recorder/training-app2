@@ -1,5 +1,5 @@
 const DB_NAME = 'trainingApp';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let _db = null;
 
@@ -24,6 +24,10 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('hikes')) {
+        const st = db.createObjectStore('hikes', { keyPath: 'id' });
+        st.createIndex('yearMonth', 'yearMonth', { unique: false });
       }
     };
 
@@ -66,6 +70,24 @@ function dbDelete(store, key) {
     req.onsuccess = () => resolve();
     req.onerror  = () => reject(req.error);
   }));
+}
+
+// ── 登山（hikes）専用ヘルパー ──
+function getHikesByMonth(yearMonth) {
+  return dbGetAllByIndex('hikes', 'yearMonth', yearMonth)
+    .then(list => list.sort((a, b) => a.order - b.order));
+}
+
+function getAllHikes() {
+  return dbGetAll('hikes');
+}
+
+function saveHike(hike) {
+  return dbPut('hikes', hike);
+}
+
+function deleteHike(id) {
+  return dbDelete('hikes', id);
 }
 
 function dbGetAllByIndex(store, indexName, value) {

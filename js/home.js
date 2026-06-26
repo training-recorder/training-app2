@@ -209,6 +209,11 @@ async function renderHome() {
       ${menuHTML}
     </section>
 
+    <section>
+      <h2>今月の登山</h2>
+      <div id="hike-section-inner"><p class="placeholder">読込中...</p></div>
+    </section>
+
     ${videoSectionHTML}
 
     <section class="home-record-section">
@@ -231,6 +236,7 @@ async function renderHome() {
     </section>
   `;
 
+  renderHikeSection(document.getElementById('hike-section-inner'));
   if (todayGenre) loadHomeTodayVideo(todayGenre);
   document.getElementById('goal-save-btn').addEventListener('click', saveGoal);
   document.getElementById('record-save-btn').addEventListener('click', saveRecord);

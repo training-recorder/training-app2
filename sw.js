@@ -1,4 +1,4 @@
-const CACHE_NAME = 'training-app-v7';
+const CACHE_NAME = 'training-app-v8';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const APP_SHELL = [
   './css/style.css',
   './js/util.js',
   './js/db.js',
+  './js/hikes.js',
   './js/home.js',
   './js/import.js',
   './js/history.js',

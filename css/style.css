@@ -742,3 +742,232 @@ section h2 {
   border-radius: 6px;
   line-height: 1.7;
 }
+
+/* ── 登山セクション ── */
+.hike-list {
+  margin-bottom: 10px;
+}
+
+.hike-card {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  transition: opacity .2s;
+}
+
+.hike-card.hike-done {
+  opacity: 0.55;
+}
+
+.hike-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.hike-dest {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.hike-order {
+  font-size: 0.76rem;
+  color: var(--text-sub);
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.hike-meta {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-top: 3px;
+}
+
+.hike-note {
+  font-size: 0.85rem;
+  margin-top: 6px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.hike-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hike-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hike-check-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+}
+
+.hike-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.hike-btn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 4px 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-link:hover { text-decoration: underline; }
+
+.btn-delete-sm {
+  padding: 5px 12px;
+  border: 1px solid var(--error);
+  background: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--error);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-delete-sm:active { opacity: 0.7; }
+
+/* ── 登山フォーム ── */
+.hike-form {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.hike-form-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.hike-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hike-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color .2s;
+}
+
+.hike-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.hike-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border-color .2s;
+}
+
+.hike-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.hike-form-check {
+  margin-top: 8px;
+}
+
+.hike-form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* ── 過去の登山 ── */
+.hike-history {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.hike-history-month {
+  margin-bottom: 14px;
+}
+
+.hike-history-month-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.hike-history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.hike-history-item:last-child { border-bottom: none; }
+.hike-history-item.hike-done  { opacity: 0.6; }
+
+.hike-history-dest {
+  font-weight: 600;
+  flex: 1;
+}
+
+.hike-history-date {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+}
+
+.hike-done-badge {
+  font-size: 0.72rem;
+  background: var(--success);
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
